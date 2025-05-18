@@ -11,7 +11,7 @@ logger.addHandler(handler)
 
 
 def main():
-    neptune = boto3.client("neptunedata", "us-east-1", endpoint_url="https://db-grapplegraph-1.cluster-c072qy8ounfy.us-east-1.neptune.amazonaws.com:8182")
+    neptune = boto3.client("neptunedata", "us-east-1", endpoint_url=endpoint)
     print(neptune.get_engine_status())
 
     # open the cypher file and execute one line at a time
