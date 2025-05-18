@@ -1,0 +1,7 @@
+~from,~to,~label,~id
+1,2,knows,1-2
+2,3,knows,2-3
+3,4,knows,3-4
+4,5,knows,4-5
+5,6,knows,5-6
+6,1,knows,6-1
