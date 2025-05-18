@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+.pkl
+.csv
+.ipynb_checkpoints
