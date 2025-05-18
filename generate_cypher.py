@@ -1,9 +1,20 @@
 import pickle
 import random
+
+def create_cypher_node(label, properties):
+    props = ", ".join([f"{key}: '{value}'" for key, value in properties.items()])
+    return f"MERGE (:{label} {{{props}}})"
+
+def create_cypher_relationship(label1, id1, label2, id2, relationship):
+    return f""" \
+    MATCH (a:{label1} {{id: '{id1}'}}), (b:{label2} {{id: '{id2}'}}) \
+    MERGE (a)-[:{relationship}]->(b) \
+    """
+
 def generate_cypher(households):
     members_list = []
     cypher_queries = []
-    id = 0
+
     for i, household in enumerate(households):
         household_id = str(i+300).zfill(7)
         address = household.get("address")
@@ -17,51 +28,49 @@ def generate_cypher(households):
             members = [members]
 
         # Create a node for the household
-        cypher_queries.append(f"MERGE (h:Household {{id: '{household_id}', street: '{street}', city: '{city}', state: '{state}', zip_code: '{zip_code}'}})")
+        household_properties = {
+            "id": household_id,
+            "street": street,
+            "city": city,
+            "state": state,
+            "zip_code": zip_code
+        }
+        cypher_queries.append(create_cypher_node("Household", household_properties))
 
-        for i, member in enumerate(members):
-            # print(member)
+        for member in enumerate(members):
             # Ensure member is a dictionary
             if not isinstance(member, dict):
                 raise ValueError(f"Expected a dictionary for member, got {type(member)}")
-
 
             members_list.append(member)
             first_name = member.get("first_name")
             last_name = member.get("last_name")
             member_id = member.get("id")
-            # a merge cypher query to add the member to the graph
-            cypher = f"MERGE (m:Member {{id: '{member_id}', first_name: '{first_name}', last_name: '{last_name}'}})"
-            cypher_queries.append(cypher)
+
+            # Create a node for the member
+            member_properties = {
+                "id": member_id,
+                "first_name": first_name,
+                "last_name": last_name
+            }
+            cypher_queries.append(create_cypher_node("Member", member_properties))
 
             # Email and Member relationship
             email = member.get("email")
-            cypher = f"MERGE (e:Email {{email: '{email}'}})"
-            cypher_queries.append(cypher)
-            cypher = f""" \
-            MATCH (m:Member {{id: '{member_id}'}}), (e:Email {{email: '{email}'}}) \
-            MERGE (m)-[:HAS_EMAIL]->(e) \
-            """
-            cypher_queries.append(cypher)
+            email_properties = {"email": email}
+            cypher_queries.append(create_cypher_node("Email", email_properties))
+            cypher_queries.append(create_cypher_relationship("Member", member_id, "Email", email, "HAS_EMAIL"))
 
             # Phone number and Member relationship
             phone_number = member.get("phone_number")
-            cypher = f"MERGE (p:Phone {{phone_number: '{member['phone_number']}'}})"
-            cypher_queries.append(cypher)
-            cypher = f""" \
-            MATCH (m:Member {{id: '{member_id}'}}), (p:Phone {{phone_number: '{phone_number}'}}) \
-            MERGE (m)-[:HAS_PHONE]->(p) \
-            """
-            cypher_queries.append(cypher)
-            
-            # House household and Member relationship
-            cypher = f""" \
-            MATCH (m:Member {{id: '{member_id}'}}), (h:Household {{id: '{household_id}'}}) \
-            MERGE (m)-[:HAS_ADDRESS]->(h) \
-            """
-            cypher_queries.append(cypher)
-            id += 1
-    
+            phone_properties = {"phone_number": phone_number}
+            cypher_queries.append(create_cypher_node("Phone", phone_properties))
+            cypher_queries.append(create_cypher_relationship("Member", member_id, "Phone", phone_number, "HAS_PHONE"))
+
+            # Household and Member relationship
+            cypher_queries.append(create_cypher_relationship("Member", member_id, "Household", household_id, "HAS_ADDRESS"))
+
+
     return "\n".join(cypher_queries), members_list
 
 def generate_married_relationships(members):
@@ -92,25 +101,4 @@ def generate_associated_with_relationships(members):
         """
         cypher_queries.append(cypher)
     return "\n".join(cypher_queries)
-
-
-if __name__ == "__main__":
-    # read the fake_households.pkl file
-    with open("fake_households.pkl", "rb") as f:
-        households = pickle.load(f)
-
-    cypher_query, members = generate_cypher(households)
-    with open("cmain_cypher_query.cypher", "w") as f:
-        f.write(cypher_query)
-    print("Cypher query generated and saved to main_cypher_query.cypher")
-
-    cypher_query = generate_married_relationships(members)
-    with open("cmarried_cypher_query.cypher", "w") as f:
-        f.write(cypher_query)
-    print("Cypher query generated and saved to cypher_query.cypher_married")
-
-    cypher_query = generate_associated_with_relationships(members)
-    with open("cassociated_cypher_query.cypher", "w") as f:
-        f.write(cypher_query)
-    print("Cypher query generated and saved to cypher_query.cypher_associated")
 

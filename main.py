@@ -1,89 +1,90 @@
-import pandas as pd
+import argparse
+import pickle
 import boto3
+import random
+from typing import Dict, Any
+from faker import Faker
+from faker.providers import BaseProvider
 
-def main():
+from utils import generate_normal_household, generate_fraud_household
+from utils import AddressProvider, PersonProvider
+from generate_cypher import generate_cypher, generate_married_relationships, generate_associated_with_relationships
 
-    # print("Hello from bucket-test!")
-    # s3 = boto3.client("s3")
-    # bucket_name = "grapplegraph-bucket"
-    # file_name = "test.csv"
-    # # Create a sample DataFrame
-    # data = {
-    #     "Name": ["Alice", "Bob", "Charlie"],
-    #     "Age": [25, 30, 35],
-    #     "City": ["New York", "Los Angeles", "Chicago"]
-    # }
-    # df = pd.DataFrame(data)
-    # # Save the DataFrame to a CSV file
-    # df.to_csv(file_name, index=False)
-    # # Upload the CSV file to S3
-    # s3.upload_file(file_name, bucket_name, file_name)
-    # # List the objects in the S3 bucket
-    # response = s3.list_objects_v2(Bucket=bucket_name)
-    # if "Contents" in response:
-    #     print("Objects in S3 bucket:")
-    #     for obj in response["Contents"]:
-    #         print(obj["Key"])
-    # else:
-    #     print("No objects found in the bucket.")
-    # # Download the CSV file from S3
-    # s3.download_file(bucket_name, file_name, "downloaded_" + file_name)
-    # # Read the downloaded CSV file into a DataFrame
-    # downloaded_df = pd.read_csv("downloaded_" + file_name)
-    # print("Downloaded DataFrame:")
-    # print(downloaded_df)
-    # # Clean up the local files
-    # import os
-    # os.remove(file_name)
-    # os.remove("downloaded_" + file_name)
-    # # Clean up the S3 bucket
-    # s3.delete_object(Bucket=bucket_name, Key=file_name)
-    # print(f"Deleted {file_name} from S3 bucket {bucket_name}")
 
-    def make_fake_neptune_data():
-        # Create a sample DataFrame for Neptune
-        person_nodes = {
-            "fname": ["Matt", "Maggie", "Whit", "Lucy", "Herb", "Kathy"],
-            "lname": ["Grogan", "Grogan", "Grogan", "Grogan", "Marquedant", "Marquedant"],
-            "~id": [1, 2, 3, 4, 5, 6],
-            "~label": ["Person", "Person", "Person", "Person", "Person", "Person"]
-        }
-        person_edges = {
-            "~from": [1, 2, 3, 4, 5, 6],
-            "~to": [2, 3, 4, 5, 6, 1],
-            "~label": ["knows", "knows", "knows", "knows", "knows", "knows"],
-            "~id": ["1-2", "2-3", "3-4", "4-5", "5-6", "6-1"]
-        }
-        person_nodes_df = pd.DataFrame(person_nodes)
-        person_edges_df = pd.DataFrame(person_edges)
+def generate_fake_data(normal, fraud):
+    """
+    Generate fake household data and save it to a pickle file.
+    """
+    fake = Faker()
+    fake.add_provider(AddressProvider)
+    fake.add_provider(PersonProvider)
+    Faker.seed(0)
 
-        node_file = "neptune_test_person_nodes.csv"
-        edge_file = "neptune_test_person_edges.csv"
-        person_nodes_df.to_csv(node_file, index=False)
-        person_edges_df.to_csv(edge_file, index=False)
-        print(f"Created {node_file} and {edge_file}")
-        # Upload the CSV files to S3
-        s3 = boto3.client("s3")
-        bucket_name = "grapplegraph-bucket"
-        s3.upload_file(node_file, bucket_name, node_file)
-        s3.upload_file(edge_file, bucket_name, edge_file)
-        print(f"Uploaded {node_file} and {edge_file} to S3 bucket {bucket_name}")
-        # List the objects in the S3 bucket
-        response = s3.list_objects_v2(Bucket=bucket_name)
-        if "Contents" in response:
-            print("Objects in S3 bucket:")
-            for obj in response["Contents"]:
-                print(obj["Key"])
-        else:
-            print("No objects found in the bucket.")
-        bucket_name = "grapplegraph-bucket"
-        cypher_file = "cypher_query.cypher_main"
-        s3.download_file(bucket_name, cypher_file, "downloaded_" + cypher_file)
-        # Upload the CSV file to S3:wq
+    households = []
+    for _ in range(10):
+        households.append(generate_normal_household(fake))
+    for _ in range(10):
+        households.append(generate_fraud_household(fake))
 
-    make_fake_neptune_data()
+    # randomly generate an association between 25% of the members between households
+
+    # generate 100 random associations between members of different households
+    for _ in range(100):
+        household1 = random.choice(households)
+        household2 = random.choice(households)
+        while household1 == household2:
+            household2 = random.choice(households)
+        member1 = random.choice(household1["members"])
+        member2 = random.choice(household2["members"])
+        member1["associated_with_id"] = member2["id"]
+
+    pickle_file = "fake_households.pkl"
+    with open(pickle_file, "wb") as f:
+        pickle.dump(households, f)
+    print(f"Generated {len(households)} households and saved to {pickle_file}")
+    s3 = boto3.client("s3")
+    bucket_name = "grapplegraph-bucket"  # replace with your bucket name
+    s3.upload_file(pickle_file, bucket_name, pickle_file)
+    print(f"Uploaded {pickle_file} to S3 bucket {bucket_name}")
+    return households
+
+
+
+def main(normal, fraud):
+    """
+    Main function to generate fake data and upload to S3.
+    """
+    all_cypher_queries = []
+    households = generate_fake_data(normal, fraud)
+    # Save the households to a pickle file
+    with open("fake_households.pkl", "wb") as f:
+        pickle.dump(households, f)
+    print(f"Generated {len(households)} households and saved to fake_households.pkl")
+
+    cypher_queries, members_list = generate_cypher(households)
+    all_cypher_queries.extend(cypher_queries)
+
+    married_relationships = generate_married_relationships(members_list)
+    all_cypher_queries.append(married_relationships)
+
+    associated_with_relationships = generate_associated_with_relationships(members_list)
+    all_cypher_queries.append(associated_with_relationships)
+
+    cypher_file = "fake_households.cypher"
+    with open(cypher_file, "w") as f:
+        f.write("\n".join(all_cypher_queries))
+    print(f"Generated Cypher queries and saved to {cypher_file}")
+
 
 if __name__ == "__main__":
-    main()
 
-    # make_fake_neptune_data()
+
+    parser = argparse.ArgumentParser(description="Generate fake household data.")
+    parser.add_argument("num_normal", type=int, help="Number of normal households")
+    parser.add_argument("num_fraud", type=int, help="Number of fraud households")
+    args = parser.parse_args()
+
+    num_normal = args.num_normal
+    num_fraud = args.num_fraud
+
+    main(num_normal, num_fraud)
