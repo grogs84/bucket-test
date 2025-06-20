@@ -1,0 +1,179 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Neptune Graph Visualization</title>
+        <!-- Load Vis.js library -->
+        <script type="text/javascript" src="[https://unpkg.com/vis-network/standalone/umd/vis-network.min.js](https://unpkg.com/vis-network/standalone/umd/vis-network.min.js)"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f4f4f4;
+            }
+            #mynetwork {
+                width: 100%;
+                height: 600px; /* Adjust height as needed */
+                border: 1px solid lightgray;
+                background-color: #fff;
+                border-radius: 8px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            h1 {
+                text-align: center;
+                color: #333;
+                margin-bottom: 20px;
+            }
+            p {
+                text-align: center;
+                color: #666;
+            }
+            .instructions {
+                background-color: #e0f7fa;
+                border-left: 5px solid #00bcd4;
+                padding: 15px;
+                margin-bottom: 20px;
+                border-radius: 4px;
+                color: #006064;
+                font-size: 0.9em;
+            }
+            pre {
+                background-color: #eee;
+                padding: 10px;
+                border-radius: 4px;
+                overflow-x: auto;
+                font-size: 0.85em;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Graph Visualization from Neptune Analytics</h1>
+        <p>This graph was generated using data exported from your AWS Graph Notebook session.</p>
+
+        <div class="instructions">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>In your JupyterLab notebook, run the cell to print "Nodes JSON" and "Edges JSON".</li>
+                <li>Copy the JSON content for "nodes_data" and "edges_data" from your notebook output.</li>
+                <li>Paste the copied JSON data directly into the `nodes_json_data` and `edges_json_data` variables below, replacing the placeholder empty arrays.</li>
+                <li>Save this HTML file and open it in your web browser.</li>
+            </ol>
+        </div>
+
+        <div id="mynetwork"></div>
+
+        <script type="text/javascript">
+            // --- PASTE YOUR JSON DATA HERE ---
+            // Replace the empty arrays below with the actual JSON content
+            // copied from your JupyterLab notebook output.
+
+            const nodes_json_data = []; // Paste your Nodes JSON here, e.g., [{"id": "node1", "label": "User"}, ...]
+            const edges_json_data = []; // Paste your Edges JSON here, e.g., [{"from": "node1", "to": "node2", "label": "KNOWS"}, ...]
+
+            // --- END PASTE AREA ---
+
+
+            if (nodes_json_data.length === 0 || edges_json_data.length === 0) {
+                alert("Please paste your graph data into the 'nodes_json_data' and 'edges_json_data' variables in the HTML file.");
+            } else {
+                // Parse the nodes and edges from the JSON data
+                const nodes = new vis.DataSet(nodes_json_data);
+                const edges = new vis.DataSet(edges_json_data);
+
+                // Create a network
+                const container = document.getElementById('mynetwork');
+                const data = {
+                    nodes: nodes,
+                    edges: edges
+                };
+
+                // Default options (you can customize these further if needed)
+                const options = {
+                    nodes: {
+                        shape: 'dot',
+                        size: 15,
+                        font: {
+                            size: 12,
+                            color: '#333333'
+                        },
+                        borderWidth: 1,
+                        color: {
+                            background: '#97C2E5',
+                            border: '#2B7CE9',
+                            highlight: {
+                                background: '#D2E5FF',
+                                border: '#2B7CE9'
+                            }
+                        }
+                    },
+                    edges: {
+                        color: {
+                            inherit: false,
+                            color: '#848484',
+                            highlight: '#848484',
+                            hover: '#848484'
+                        },
+                        arrows: 'to',
+                        font: {
+                            size: 10,
+                            color: '#333333',
+                            align: 'middle'
+                        },
+                        smooth: {
+                            enabled: true,
+                            type: 'dynamic'
+                        }
+                    },
+                    physics: {
+                        enabled: true,
+                        barnesHut: {
+                            gravitationalConstant: -2000,
+                            centralGravity: 0.3,
+                            springLength: 95,
+                            springConstant: 0.04,
+                            damping: 0.09,
+                            avoidOverlap: 0
+                        },
+                        maxVelocity: 50,
+                        minVelocity: 0.1,
+                        solver: 'barnesHut',
+                        timestep: 0.5,
+                        adaptiveTimestep: true
+                    },
+                    interaction: {
+                        navigationButtons: true,
+                        keyboard: true,
+                        tooltipDelay: 300
+                    }
+                };
+
+                // Initialize the network
+                const network = new vis.Network(container, data, options);
+
+                // Event listener to potentially update options based on node labels if needed
+                // This part mimics the graph-notebook's automatic styling for labels.
+                network.on("initRedraw", function() {
+                    const allNodes = nodes.get();
+                    allNodes.forEach(node => {
+                        const nodeLabel = node.label;
+                        let customOptions = {};
+
+                        // Example: Apply different colors based on node label
+                        if (nodeLabel === 'airport') {
+                            customOptions = { color: { background: '#FFC107', border: '#FFA000' }, font: { color: 'black' } };
+                        } else if (nodeLabel === 'country') {
+                            customOptions = { color: { background: '#8BC34A', border: '#689F38' }, font: { color: 'white' } };
+                        }
+                        // Add more conditions for other labels as needed
+
+                        // Merge with existing node properties and update
+                        nodes.update({ id: node.id, ...customOptions });
+                    });
+                });
+            }
+        </script>
+    </body>
+    </html>
+    
