@@ -1,0 +1,61 @@
+You've hit the core of the problem: if JupyterLab is asking you to install Node.js and npm for jupyter lab build, and you don't have the permissions to do so, it means the JupyterLab frontend on your SageMaker instance is locked down and cannot install or rebuild the necessary JavaScript extensions for ipywidgets (and specifically, aws-graph-notebook's custom visualization widgets).
+
+This confirms that the interactive graph visualization directly within your JupyterLab output cells won't be possible under your current environment's restrictions. The Failed to load model class 'ForceModel' error is precisely because the browser-side JupyterLab doesn't have the JavaScript code to render that specific part of the aws-graph-notebook visualization.
+What You Can Do (Alternative Visualization)
+
+Since you can't get the interactive visualization within JupyterLab, the best alternative is to extract the graph data from the notebook and visualize it externally using a simple HTML file with vis.js.
+
+The aws-graph-notebook magics (like %%gremlin or %%oc) generate the graph data (nodes and edges) internally in a format compatible with vis.js. We can capture this data.
+
+Here's how:
+
+    Retrieve the Raw Graph Data from JupyterLab:
+    After you run a graph query cell (e.g., %%gremlin or %%oc), the aws-graph-notebook populates a special variable called _graph_notebook_vis_data (or similar, depending on the exact version and setup, though this is the common one). We can access this data programmatically.
+
+    In a new cell, run:
+    Python
+
+import json
+from IPython.display import display, HTML
+
+# Assuming your graph query was just run and populated _graph_notebook_vis_data
+# This variable holds the data for the last generated graph
+graph_data = _graph_notebook_vis_data
+
+# Extract nodes and edges
+nodes_data = graph_data['graph']['nodes']
+edges_data = graph_data['graph']['edges']
+
+# Convert to JSON strings for embedding in HTML
+nodes_json = json.dumps(nodes_data)
+edges_json = json.dumps(edges_data)
+
+print("Nodes JSON (copy this):")
+print(nodes_json)
+print("\nEdges JSON (copy this):")
+print(edges_json)
+
+This cell will print the JSON strings for your nodes and edges. Copy these outputs.
+
+Create an HTML File for External Visualization:
+Save the following content as an HTML file (e.g., graph_viewer.html) on your local machine.
+HTML
+
+
+    External Vis.js Graph Viewer
+    Jun 20, 7:18 AM
+
+    Paste Your Data into the HTML File:
+        Open the graph_viewer.html file you just saved in a text editor.
+        Find the lines that say:
+        JavaScript
+
+        const nodes_json_data = []; // Paste your Nodes JSON here
+        const edges_json_data = []; // Paste your Edges JSON here
+
+        Carefully paste the JSON output you got from your JupyterLab notebook into the respective empty array brackets []. Make sure it's valid JSON.
+
+    Open graph_viewer.html in Your Browser:
+        Double-click the saved graph_viewer.html file on your local machine. It will open in your default web browser, and you should see your interactive graph.
+
+This method allows you to separate the graph query execution in SageMaker from the visualization, bypassing the JupyterLab frontend extension limitations. You'll get the full interactive vis.js experience in your local browser.
